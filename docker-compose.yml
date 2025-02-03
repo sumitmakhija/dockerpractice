@@ -1,10 +1,37 @@
 version: '3'
+
 services:
   web:
     build: .
-    command: bash -c "python manage.py makemigrations && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
     container_name: myapp
+    command: bash -c "python manage.py makemigrations && python manage.py migrate && gunicorn myproject.wsgi:application --bind 0.0.0.0:8000"
     volumes:
       - .:/myapp
     ports:
       - "8000:8000"
+    depends_on:
+      - redis
+      - rabbitmq
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: rabbitmq
+    ports:
+      - "15672:15672"  # RabbitMQ management console
+      - "5672:5672"    # RabbitMQ default port
+
+  celery:
+    build: .
+    container_name: celery_worker
+    command: ["celery", "-A", "myproject", "worker", "--loglevel=info"]
+    depends_on:
+      - rabbitmq
+      - redis
+    volumes:
+      - .:/myapp
